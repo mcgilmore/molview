@@ -2,6 +2,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
+from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem import Descriptors
 from PyQt5.QtGui import QPixmap, QPalette, QColor, QImage, QPainter
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton, QFileDialog, QHBoxLayout, QLabel, QDialog, QTextEdit, QTabWidget
@@ -12,7 +13,7 @@ class MoleculeViewer(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.currentMolecule = Chem.MolFromSmiles("C(CC(=O)NC(CS)C(=O)NCC(=O)O)C(C(=O)O)N")
+        self.currentMolecule = Chem.MolFromSmiles("CC(C(=O)NC(CCC(=O)NC(CCCC(C(=O)O)N)C(=O)NC(C)C(=O)NC(C)C(=O)O)C(=O)O)NC(=O)C(C)OC1C(C(OC(C1O)CO)OP(=O)(O)OP(=O)(O)OCC2C(C(C(O2)N3C=CC(=O)NC3=O)O)O)NC(=O)C")
 
         # set window title
         self.setWindowTitle("Molecule Viewer")
@@ -55,8 +56,16 @@ class MoleculeViewer(QMainWindow):
         # create menu bar
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
-        open_smiles_action = file_menu.addAction("Open SMILES")
+
+        # create submenu for opening files
+        open_menu = QMenu("Open", self)
+        file_menu.addMenu(open_menu)
+
+        # create submenu opening options
+        open_smiles_action = open_menu.addAction("Paste SMILES")
         open_smiles_action.triggered.connect(self.open_smiles_dialog)
+        open_file_action = open_menu.addAction("Open File")
+        open_file_action.triggered.connect(self.open_file_dialog)
 
     def open_smiles_dialog(self):
         dialog = QDialog(self)
@@ -69,7 +78,7 @@ class MoleculeViewer(QMainWindow):
 
         # create submit button
         submit_button = QPushButton("Submit", dialog)
-        submit_button.clicked.connect(lambda: self.load_molecule(str(smiles_textbox.toPlainText())))
+        submit_button.clicked.connect(lambda: (self.load_molecule(Chem.MolFromSmiles(str(smiles_textbox.toPlainText()))), dialog.accept()))
 
         # create dialog layout
         dialog_layout = QVBoxLayout(dialog)
@@ -79,6 +88,16 @@ class MoleculeViewer(QMainWindow):
 
         # show dialog
         dialog.exec_()
+
+    def open_file_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open Molecule File", "", "Molecule Files (*.mol);;All Files (*)", options=options)
+        if file_name:
+            with open(file_name, "r") as f:
+                molblock = f.read()
+            molecule = Chem.MolFromMolBlock(molblock)
+            self.load_molecule(molecule)
 
     def draw_molecule(self, molecule):
         AllChem.Compute2DCoords(molecule)
@@ -96,17 +115,20 @@ class MoleculeViewer(QMainWindow):
         pixmap = QPixmap.fromImage(img)
         self.canvas.setPixmap(pixmap)
 
-    def load_molecule(self, smiles):
-        molecule = Chem.MolFromSmiles(smiles)
-        #molecule = Chem.AddHs(molecule)
-        self.currentMolecule = molecule
-        self.molecularWeightLabel.setText("Average mass: " + str(round(Descriptors.MolWt(molecule), 2)))
-        self.monoisotopicMwLabel.setText("Monoisotopic mass: " + str(round(Descriptors.ExactMolWt(molecule), 2)))
-        self.draw_molecule(molecule)
+    def load_molecule(self, molecule):
+        # clean up and uncharge molecule
+        mol = rdMolStandardize.Cleanup(molecule)
+        uncharger = rdMolStandardize.Uncharger()
+        mol = uncharger.uncharge(mol)
+
+        self.currentMolecule = mol
+        self.molecularWeightLabel.setText("Average mass: " + str(round(Descriptors.MolWt(mol), 2)))
+        self.monoisotopicMwLabel.setText("Monoisotopic mass: " + str(round(Descriptors.ExactMolWt(mol), 2)))
+        self.draw_molecule(mol)
 
 if __name__ == "__main__":
     app = QApplication([])
     viewer = MoleculeViewer()
     viewer.show()
-    viewer.load_molecule("C(CC(=O)NC(CS)C(=O)NCC(=O)O)C(C(=O)O)N")
+    viewer.load_molecule(viewer.currentMolecule)
     app.exec_()
