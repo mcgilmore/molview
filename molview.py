@@ -4,10 +4,12 @@ from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem import Descriptors
+from pyteomics import mass
 from PyQt5.QtGui import QPixmap, QPalette, QColor, QImage, QPainter
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton, QFileDialog, QHBoxLayout, QLabel, QDialog, QTextEdit, QTabWidget
 from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from PyQt5.QtCore import Qt, QByteArray
+
 
 class MoleculeViewer(QMainWindow):
     def __init__(self):
@@ -33,13 +35,39 @@ class MoleculeViewer(QMainWindow):
         self.canvas.setAutoFillBackground(True)
         self.canvas.setPalette(pal)
 
-        # create properties tab widget
+        # create properties tab labels for molecular properties
         self.molecularWeightLabel = QLabel("Average mass:")
         self.monoisotopicMwLabel = QLabel("Monoisotopic mass: ")
+        self.space1Label = QLabel("")
+        self.pve_charge_Label = QLabel("<u>Positive Charge States</u>")
+        self.m1_pve_Label = QLabel("[M+H]+: ")
+        self.m2_pve_Label = QLabel("[M+2H]<sup>2+</sup>: ")
+        self.m3_pve_Label = QLabel("[M+3H]<sup>3+</sup>: ")
+        self.space2Label = QLabel("")
+        self.nve_charge_Label = QLabel("<u>Negative Charge States</u>")
+        self.m1_nve_Label = QLabel("[M-H]-: ")
+        self.m2_nve_Label = QLabel("[M-2H]<sup>2-</sup>: ")
+        self.m3_nve_Label = QLabel("[M-3H]<sup>3-</sup>: ")
+
+        # set properties of properties tab
         self.properties_tab = QWidget(self.central_widget)
         self.properties_layout = QVBoxLayout(self.properties_tab)
+        self.properties_layout.setAlignment(Qt.AlignTop)
+        self.properties_layout.setSpacing(0)
+
+        # add labels to layout
         self.properties_layout.addWidget(self.molecularWeightLabel)
         self.properties_layout.addWidget(self.monoisotopicMwLabel)
+        self.properties_layout.addWidget(self.space1Label)
+        self.properties_layout.addWidget(self.pve_charge_Label)
+        self.properties_layout.addWidget(self.m1_pve_Label)
+        self.properties_layout.addWidget(self.m2_pve_Label)
+        self.properties_layout.addWidget(self.m3_pve_Label)
+        self.properties_layout.addWidget(self.space2Label)
+        self.properties_layout.addWidget(self.nve_charge_Label)
+        self.properties_layout.addWidget(self.m1_nve_Label)
+        self.properties_layout.addWidget(self.m2_nve_Label)
+        self.properties_layout.addWidget(self.m3_nve_Label)
 
         # create tab widget
         self.tab_widget = QTabWidget(self.central_widget)
@@ -124,6 +152,12 @@ class MoleculeViewer(QMainWindow):
         self.currentMolecule = mol
         self.molecularWeightLabel.setText("Average mass: " + str(round(Descriptors.MolWt(mol), 2)))
         self.monoisotopicMwLabel.setText("Monoisotopic mass: " + str(round(Descriptors.ExactMolWt(mol), 2)))
+        self.m1_pve_Label.setText("[M+H]+: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 1), 2)))
+        self.m2_pve_Label.setText("[M+2H]<sup>2+</sup>: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 2), 2)))
+        self.m3_pve_Label.setText("[M+3H]<sup>3+</sup>: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 3), 2)))
+        self.m1_nve_Label.setText("[M-H]-: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -1), 2)))
+        self.m2_nve_Label.setText("[M-2H]<sup>2-</sup>: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -2), 2)))
+        self.m3_nve_Label.setText("[M-3H]<sup>3-</sup>: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -3), 2)))
         self.draw_molecule(mol)
 
 if __name__ == "__main__":
