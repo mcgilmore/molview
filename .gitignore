@@ -1,3 +1,6 @@
 
 .DS_Store
 temp.pdb
+MassBank_Riken.msp
+__pycache__
+__pycache__/molecule.cpython-38.pyc

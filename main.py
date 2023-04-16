@@ -4,30 +4,39 @@ from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem import Descriptors
+
 from pyteomics import mass
+
+from pyms.Spectrum import MassSpectrum
+
+from molecule import Molecule
+
 from PyQt5.QtGui import QPixmap, QPalette, QColor, QImage, QPainter
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton, QFileDialog, QHBoxLayout, QLabel, QDialog, QTextEdit, QTabWidget
 from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from PyQt5.QtCore import Qt, QByteArray
 
-
 class MoleculeViewer(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.currentMolecule = Chem.MolFromSmiles("CC(C(=O)NC(CCC(=O)NC(CCCC(C(=O)O)N)C(=O)NC(C)C(=O)NC(C)C(=O)O)C(=O)O)NC(=O)C(C)OC1C(C(OC(C1O)CO)OP(=O)(O)OP(=O)(O)OCC2C(C(C(O2)N3C=CC(=O)NC3=O)O)O)NC(=O)C")
+        self.currentMolecule = Molecule(Chem.MolFromSmiles("CC(C(=O)NC(CCC(=O)NC(CCCC(C(=O)O)N)C(=O)NC(C)C(=O)NC(C)C(=O)O)C(=O)O)NC(=O)C(C)OC1C(C(OC(C1O)CO)OP(=O)(O)OP(=O)(O)OCC2C(C(C(O2)N3C=CC(=O)NC3=O)O)O)NC(=O)C"))
 
         # set window title
-        self.setWindowTitle("Molecule Viewer")
+        self.setWindowTitle("MolView")
         self.resize(800, 600)
 
         # create central widget
         self.central_widget = QWidget(self)
 
-        # create canvas
+        # create 2D canvas
         self.canvas = QLabel(self.central_widget)
-        self.canvas.setAlignment(Qt.AlignCenter)
+        self.canvas.setAlignment(Qt.AlignTop)
         self.canvas.setFixedSize(600, 600)
+
+        # create layout
+        self.display_layout = QVBoxLayout()
+        self.display_layout.addWidget(self.canvas)
 
         # set white background
         pal = QPalette()
@@ -48,6 +57,8 @@ class MoleculeViewer(QMainWindow):
         self.m1_nve_Label = QLabel("[M-H]-: ")
         self.m2_nve_Label = QLabel("[M-2H]<sup>2-</sup>: ")
         self.m3_nve_Label = QLabel("[M-3H]<sup>3-</sup>: ")
+
+        # TODO: double click = copy property to clipboard
 
         # set properties of properties tab
         self.properties_tab = QWidget(self.central_widget)
@@ -75,7 +86,7 @@ class MoleculeViewer(QMainWindow):
 
         # create main layout
         self.main_layout = QHBoxLayout(self.central_widget)
-        self.main_layout.addWidget(self.canvas)
+        self.main_layout.addLayout(self.display_layout)
         self.main_layout.addWidget(self.tab_widget)
 
         # set central widget
@@ -127,7 +138,7 @@ class MoleculeViewer(QMainWindow):
             molecule = Chem.MolFromMolBlock(molblock)
             self.load_molecule(molecule)
 
-    def draw_molecule(self, molecule):
+    def draw_molecule2D(self, molecule):
         AllChem.Compute2DCoords(molecule)
         drawer = rdMolDraw2D.MolDraw2DSVG(600, 600)
         rdMolDraw2D.PrepareAndDrawMolecule(drawer, molecule)
@@ -142,7 +153,8 @@ class MoleculeViewer(QMainWindow):
         painter.end()
         pixmap = QPixmap.fromImage(img)
         self.canvas.setPixmap(pixmap)
-
+        #TODO: remove color or make it optional
+        
     def load_molecule(self, molecule):
         # clean up and uncharge molecule
         mol = rdMolStandardize.Cleanup(molecule)
@@ -150,15 +162,22 @@ class MoleculeViewer(QMainWindow):
         mol = uncharger.uncharge(mol)
 
         self.currentMolecule = mol
-        self.molecularWeightLabel.setText("Average mass: " + str(round(Descriptors.MolWt(mol), 2)))
-        self.monoisotopicMwLabel.setText("Monoisotopic mass: " + str(round(Descriptors.ExactMolWt(mol), 2)))
-        self.m1_pve_Label.setText("[M+H]+: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 1), 2)))
-        self.m2_pve_Label.setText("[M+2H]<sup>2+</sup>: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 2), 2)))
-        self.m3_pve_Label.setText("[M+3H]<sup>3+</sup>: " + str(round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 3), 2)))
-        self.m1_nve_Label.setText("[M-H]-: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -1), 2)))
-        self.m2_nve_Label.setText("[M-2H]<sup>2-</sup>: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -2), 2)))
-        self.m3_nve_Label.setText("[M-3H]<sup>3-</sup>: " + str(-round(mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -3), 2)))
-        self.draw_molecule(mol)
+        self.currentMolecule.m1_pve = mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 1)
+        self.currentMolecule.m2_pve = mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 2)
+        self.currentMolecule.m3_pve = mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = 3)
+        self.currentMolecule.m1_nve = -mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -1)
+        self.currentMolecule.m2_nve = -mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -2)
+        self.currentMolecule.m3_nve = -mass.calculate_mass(formula = Chem.rdMolDescriptors.CalcMolFormula(mol, False), ion_type="M", charge = -3)
+
+        self.molecularWeightLabel.setText("Average mass: " + str(round(Descriptors.MolWt(mol), 4)))
+        self.monoisotopicMwLabel.setText("Monoisotopic mass: " + str(round(Descriptors.ExactMolWt(mol), 4)))
+        self.m1_pve_Label.setText("[M+H]+: " + str(round(self.currentMolecule.m1_pve, 4)))
+        self.m2_pve_Label.setText("[M+2H]<sup>2+</sup>: " + str(round(self.currentMolecule.m2_pve, 4)))
+        self.m3_pve_Label.setText("[M+3H]<sup>3+</sup>: " + str(round(self.currentMolecule.m3_pve, 4)))
+        self.m1_nve_Label.setText("[M-H]-: " + str(round(self.currentMolecule.m1_nve, 4)))
+        self.m2_nve_Label.setText("[M-2H]<sup>2-</sup>: " + str(round(self.currentMolecule.m2_nve, 4)))
+        self.m3_nve_Label.setText("[M-3H]<sup>3-</sup>: " + str(round(self.currentMolecule.m3_nve, 4)))
+        self.draw_molecule2D(self.currentMolecule)    
 
 if __name__ == "__main__":
     app = QApplication([])
