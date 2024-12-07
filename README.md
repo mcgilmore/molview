@@ -4,6 +4,6 @@
 Opens a molecule in SMILES or mol format, displays it and shows ion values for MS analysis
 
 # Dependencies
-PyQt5: `pip install PyQt5`
-pyteomics: `pip install pyteomics`
+PyQt5: `pip install PyQt5`  
+pyteomics: `pip install pyteomics`  
 rdkit: `pip install rdkit`
